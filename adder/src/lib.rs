@@ -2,6 +2,7 @@ use serde_json::json;
 use std::{
     error::Error,
     ffi::{CStr, CString},
+    panic::catch_unwind,
 };
 
 use serde::{Deserialize, Serialize};
@@ -24,10 +25,16 @@ struct GreetResponse {
 
 #[no_mangle]
 pub extern "C" fn process_request(raw_string_ptr: *const i8) -> *const i8 {
-    match greet(raw_string_ptr) {
-        Ok(response_ptr) => response_ptr,
-        Err(err) => {
+    let result = catch_unwind(|| greet(raw_string_ptr));
+
+    match result {
+        Ok(Ok(response_ptr)) => response_ptr,
+        Ok(Err(err)) => {
             let response_json = json! ({ "error": err.to_string() });
+            encode_json_into_ptr(response_json).unwrap()
+        }
+        Err(_) => {
+            let response_json = json! ({ "error": "Rust Panic!" });
             encode_json_into_ptr(response_json).unwrap()
         }
     }
@@ -36,6 +43,7 @@ pub extern "C" fn process_request(raw_string_ptr: *const i8) -> *const i8 {
 fn greet(raw_string_ptr: *const i8) -> Result<*mut i8, Box<dyn Error>> {
     let request_str = unsafe { CStr::from_ptr(raw_string_ptr) }.to_str()?;
     let request = serde_json::from_str::<GreetRequest>(request_str)?;
+    // let request = serde_json::from_str::<GreetRequest>(request_str).unwrap(); // uncomment this to test a panic
 
     let response = GreetResponse {
         message: format!("Hi, {}! You're {} years old.", request.name, request.age),
