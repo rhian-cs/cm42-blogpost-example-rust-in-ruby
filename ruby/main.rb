@@ -3,7 +3,8 @@ require 'json'
 
 module Adder
   extend FFI::Library
-  ffi_lib '../adder/target/release/libadder.so'
+  ffi_lib ENV.fetch('LIBADDER_SO_PATH') { '../adder/target/release/libadder.so' }
+
   attach_function :add, [:uint32, :uint32], :uint32
   attach_function :process_request, [:string], :strptr
   attach_function :deallocate_ptr, [:pointer], :void
